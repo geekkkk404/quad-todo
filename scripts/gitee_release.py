@@ -7,6 +7,7 @@
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -19,20 +20,28 @@ API = f"https://gitee.com/api/v5/repos/{OWNER}/{REPO}"
 
 
 def call(url_suffix: str, token: str, *, payload: bytes | None = None,
-         headers: dict | None = None):
+         headers: dict | None = None, timeout: int = 180, retries: int = 3):
     sep = "&" if "?" in url_suffix else "?"
     url = f"{API}/{url_suffix}{sep}access_token={token}"
     method = "POST" if payload is not None else "GET"
-    req = urllib.request.Request(url, data=payload, headers=headers or {},
-                                 method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            data = resp.read()
-        return json.loads(data.decode("utf-8")) if data.strip() else {}
-    except urllib.error.HTTPError as e:
-        # 绝不打印完整 url（含 token），只带路径与响应体，便于定位
-        detail = e.read().decode("utf-8", "replace")[:500]
-        raise SystemExit(f"Gitee API 失败 {e.code} [{url_suffix}]: {detail}")
+    last = None
+    for attempt in range(1, retries + 1):
+        req = urllib.request.Request(url, data=payload, headers=headers or {},
+                                     method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = resp.read()
+            return json.loads(data.decode("utf-8")) if data.strip() else {}
+        except urllib.error.HTTPError as e:
+            # 绝不打印完整 url（含 token），只带路径与响应体，便于定位
+            detail = e.read().decode("utf-8", "replace")[:500]
+            raise SystemExit(f"Gitee API 失败 {e.code} [{url_suffix}]: {detail}")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            # GitHub 机房到 Gitee 链路对大附件偏慢，写超时等网络错误重试
+            last = e
+            print(f"[{attempt}/{retries}] 网络错误（{e}），10 秒后重试…", flush=True)
+            time.sleep(10)
+    raise SystemExit(f"Gitee API 重试 {retries} 次仍失败 [{url_suffix}]: {last}")
 
 
 def multipart(field: str, filename: str, content: bytes):
@@ -65,8 +74,9 @@ def main() -> None:
 
     zip_path = Path(zip_path)
     body, headers = multipart("file", zip_path.name, zip_path.read_bytes())
+    headers["Connection"] = "close"
     result = call(f"releases/{rel['id']}/attach_files", token,
-                  payload=body, headers=headers)
+                  payload=body, headers=headers, timeout=600)
     print("attached:", result.get("name") if isinstance(result, dict) else result)
     print("URL:", rel.get("html_url") or f"https://gitee.com/{OWNER}/{REPO}/releases/tag/{tag}")
 
