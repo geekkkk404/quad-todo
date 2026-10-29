@@ -82,8 +82,27 @@ jobs:
           path: dist
 
       - name: Create Gitee release & upload zip
+        # GitHub 机房到 Gitee 的大文件上传常超时：发行版+说明必成，附件尽力而为
+        continue-on-error: true
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
           ZIP=$(find dist -name "*.zip" | head -1)
           python scripts/gitee_release.py "${{ github.ref_name }}" "$ZIP" dist/RELEASE.md
+
+      - name: Fallback: publish zip to Gitee dist branch
+        # git 协议走 sync 同款通道，通常能过大文件；raw 直链下载，成本一条分支
+        continue-on-error: true
+        env:
+          TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          ZIP=$(find dist -name "*.zip" | head -1)
+          mkdir distrepo && cd distrepo
+          git init -q -b dist
+          git config user.email "quad-todo-ci@users.noreply.github.com"
+          git config user.name "quad-todo-ci"
+          cp "../$ZIP" .
+          git add -A
+          git commit -qm "portable zip for ${{ github.ref_name }}"
+          git remote add gitee "https://geekkkk404:${TOKEN}@gitee.com/geekkkk404/quad-todo.git"
+          git push -f gitee dist
