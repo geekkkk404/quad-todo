@@ -12,7 +12,12 @@
 
 当前版本：**v0.2** ・ License：[MIT](LICENSE)
 
-**最快上手（推荐）**：到 [Releases](https://github.com/geekkkk404/quad-todo/releases/latest) 下载 `QuadTodo-v*-win64-portable.zip`，解压后双击 `QuadTodo.bat` —— 内置运行时，无需安装 Python。
+**最快上手（推荐）**：点击本仓库页面上方的 **Releases / 发行版** 入口，下载最新的 `QuadTodo-v*-win64-portable.zip`，解压后双击 `QuadTodo.bat` —— 内置运行时，无需安装 Python。
+
+- Gitee 发行版（国内推荐）：<https://gitee.com/geekkkk404/quad-todo/releases>
+- GitHub Releases：<https://github.com/geekkkk404/quad-todo/releases/latest>
+
+> ⚠️ 请认准发行版里的绿色包 zip。仓库代码页的「下载 zip / tar.gz」按钮是**源码包**，不含运行时，无法双击直接使用。
 
 **源码方式**：下载 `quad_todo.pyw` 双击运行，需已安装 Python 3.8+（仅标准库 tkinter，无需 pip 安装任何东西）。
 
