@@ -53,9 +53,10 @@ def main() -> None:
     releases = call("releases?per_page=50", token)
     rel = next((r for r in releases if r.get("tag_name") == tag), None)
     if rel is None:
-        # Gitee API v5 对该端点接受表单编码，JSON 体曾报 400
+        # Gitee API v5：target_commitish 必填（即使 tag 已存在），表单编码而非 JSON
         form = urlencode({"tag_name": tag, "name": f"QuadTodo {tag}",
-                          "body": notes, "prerelease": "false"}).encode("utf-8")
+                          "body": notes, "prerelease": "false",
+                          "target_commitish": "main"}).encode("utf-8")
         rel = call("releases", token, payload=form,
                    headers={"Content-Type": "application/x-www-form-urlencoded"})
         print("Gitee release created:", rel.get("tag_name"), "id", rel.get("id"))
