@@ -10,11 +10,13 @@
   <img src="assets/ui.png" alt="QuadTodo 主界面" width="684">
 </p>
 
-当前版本：**v0.1** ・ License：[MIT](LICENSE)
+当前版本：**v0.2** ・ License：[MIT](LICENSE)
 
-**最快上手**：到 [Releases](https://github.com/geekkkk404/quad-todo/releases/latest) 下载 `quad_todo.pyw`，双击运行。
+**最快上手（推荐）**：到 [Releases](https://github.com/geekkkk404/quad-todo/releases/latest) 下载 `QuadTodo-v*-win64-portable.zip`，解压后双击 `QuadTodo.bat` —— 内置运行时，无需安装 Python。
 
-> 国内镜像：[gitee.com/geekkkk404/quad-todo](https://gitee.com/geekkkk404/quad-todo)（Actions 自动同步）。Issue 请统一到 GitHub 提交。
+**源码方式**：下载 `quad_todo.pyw` 双击运行，需已安装 Python 3.8+（仅标准库 tkinter，无需 pip 安装任何东西）。
+
+> 国内镜像：[gitee.com/geekkkk404/quad-todo](https://gitee.com/geekkkk404/quad-todo)（Actions 自动同步，发行版同步发布）。Issue 请统一到 GitHub 提交。
 
 ## 特性
 
@@ -28,7 +30,8 @@
 ## 环境要求
 
 - Windows 10 / 11
-- Python 3.8+（仅用标准库 tkinter，无需 `pip install` 任何东西）
+- 绿色免安装包：无任何外部依赖，开箱即用
+- 源码运行：Python 3.8+
 
 ## 使用
 

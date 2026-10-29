@@ -1,4 +1,4 @@
-name: sync-to-gitee
+name: sync-and-release
 
 on:
   push:
@@ -8,9 +8,12 @@ on:
   schedule:
     - cron: "47 20 * * 1" # UTC 每周一 20:47（北京时间周二 04:47）兜底，避开整点拥塞
 
+permissions:
+  contents: write
+
 concurrency:
-  group: gitee-sync
-  cancel-in-progress: true
+  group: sync-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -28,3 +31,59 @@ jobs:
           # 用 origin/main 引用而非本地分支名，保证 tag 触发（detached HEAD）时同样可用
           git push --force "$R" "origin/main:refs/heads/main"
           git push --force "$R" "+refs/tags/*:refs/tags/*"
+
+  build-portable:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: sync
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Download matching embeddable Python
+        shell: pwsh
+        run: |
+          $v = (python -c "import platform;print(platform.python_version())").Trim()
+          Invoke-WebRequest "https://www.python.org/ftp/python/$v/python-$v-embed-amd64.zip" -OutFile embed.zip
+
+      - name: Build portable zip
+        run: python scripts/build_portable.py --embeddable-zip embed.zip
+
+      - name: Write release notes
+        run: python scripts/make_notes.py "${{ github.ref_name }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: dist/*
+
+      - name: Create GitHub release & upload zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $zip = (Get-ChildItem dist -Filter *.zip | Select-Object -First 1).FullName
+          gh release create "${{ github.ref_name }}" "$zip" --title "QuadTodo ${{ github.ref_name }}" --notes-file dist/RELEASE.md
+          if ($LASTEXITCODE -ne 0) { gh release upload "${{ github.ref_name }}" "$zip" --clobber }
+
+  gitee-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [sync, build-portable]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: dist
+
+      - name: Create Gitee release & upload zip
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          ZIP=$(find dist -name "*.zip" | head -1)
+          python scripts/gitee_release.py "${{ github.ref_name }}" "$ZIP" dist/RELEASE.md

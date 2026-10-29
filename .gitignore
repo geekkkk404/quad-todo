@@ -6,3 +6,8 @@ tasks.json.bak
 
 __pycache__/
 *.pyc
+
+# 本地构建产物（绿色包由 CI 统一构建发布）
+build/
+dist/
+embed.zip
