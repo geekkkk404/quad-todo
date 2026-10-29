@@ -3,7 +3,16 @@
 > 桌面四象限（艾森豪威尔矩阵）待办小窗 — 置顶、可折叠贴边、纯本地、零依赖。
 > A pinned, collapsible Eisenhower-matrix to-do widget for Windows. Pure tkinter, zero dependencies.
 
+<p align="center">
+  <img src="assets/hero.png" alt="QuadTodo：主界面与桌面贴边小药丸" width="100%">
+</p>
+<p align="center">
+  <img src="assets/ui.png" alt="QuadTodo 主界面" width="684">
+</p>
+
 当前版本：**v0.1** ・ License：[MIT](LICENSE)
+
+**最快上手**：到 [Releases](https://github.com/geekkkk404/quad-todo/releases/latest) 下载 `quad_todo.pyw`，双击运行。
 
 ## 特性
 
