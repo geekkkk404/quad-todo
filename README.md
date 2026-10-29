@@ -14,6 +14,8 @@
 
 **最快上手**：到 [Releases](https://github.com/geekkkk404/quad-todo/releases/latest) 下载 `quad_todo.pyw`，双击运行。
 
+> 国内镜像：[gitee.com/geekkkk404/quad-todo](https://gitee.com/geekkkk404/quad-todo)（Actions 自动同步）。Issue 请统一到 GitHub 提交。
+
 ## 特性
 
 - **四象限管理**：重要/紧急二维分类，红/橙/蓝/灰四色分区，右键拖移象限

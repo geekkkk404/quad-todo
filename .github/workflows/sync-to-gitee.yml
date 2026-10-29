@@ -1,0 +1,30 @@
+name: sync-to-gitee
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+  schedule:
+    - cron: "47 20 * * 1" # UTC 每周一 20:47（北京时间周二 04:47）兜底，避开整点拥塞
+
+concurrency:
+  group: gitee-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 完整历史与标签，镜像需要全部 refs
+
+      - name: Mirror push to Gitee
+        env:
+          TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          R="https://geekkkk404:${TOKEN}@gitee.com/geekkkk404/quad-todo.git"
+          # 用 origin/main 引用而非本地分支名，保证 tag 触发（detached HEAD）时同样可用
+          git push --force "$R" "origin/main:refs/heads/main"
+          git push --force "$R" "+refs/tags/*:refs/tags/*"
