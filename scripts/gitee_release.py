@@ -7,9 +7,11 @@
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
+from urllib.parse import urlencode
 
 OWNER = "geekkkk404"
 REPO = "quad-todo"
@@ -23,9 +25,14 @@ def call(url_suffix: str, token: str, *, payload: bytes | None = None,
     method = "POST" if payload is not None else "GET"
     req = urllib.request.Request(url, data=payload, headers=headers or {},
                                  method=method)
-    with urllib.request.urlopen(req, timeout=180) as resp:
-        data = resp.read()
-    return json.loads(data.decode("utf-8")) if data.strip() else {}
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            data = resp.read()
+        return json.loads(data.decode("utf-8")) if data.strip() else {}
+    except urllib.error.HTTPError as e:
+        # 绝不打印完整 url（含 token），只带路径与响应体，便于定位
+        detail = e.read().decode("utf-8", "replace")[:500]
+        raise SystemExit(f"Gitee API 失败 {e.code} [{url_suffix}]: {detail}")
 
 
 def multipart(field: str, filename: str, content: bytes):
@@ -46,10 +53,11 @@ def main() -> None:
     releases = call("releases?per_page=50", token)
     rel = next((r for r in releases if r.get("tag_name") == tag), None)
     if rel is None:
-        rel = call("releases", token, payload=json.dumps(
-            {"tag_name": tag, "name": f"QuadTodo {tag}", "body": notes,
-             "prerelease": False}).encode("utf-8"),
-            headers={"Content-Type": "application/json"})
+        # Gitee API v5 对该端点接受表单编码，JSON 体曾报 400
+        form = urlencode({"tag_name": tag, "name": f"QuadTodo {tag}",
+                          "body": notes, "prerelease": "false"}).encode("utf-8")
+        rel = call("releases", token, payload=form,
+                   headers={"Content-Type": "application/x-www-form-urlencoded"})
         print("Gitee release created:", rel.get("tag_name"), "id", rel.get("id"))
     else:
         print("Gitee release exists:", rel.get("tag_name"), "id", rel.get("id"))
