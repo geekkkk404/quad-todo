@@ -73,7 +73,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [sync, build-portable]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 只创建发行版+说明。实测 GitHub 机房到 Gitee 的大文件 POST/git push 全部超时，
+    # 附件由维护者在本地网络执行 scripts/upload-gitee-release.ps1 补传（见 README）。
     steps:
       - uses: actions/checkout@v4
 
@@ -82,29 +83,8 @@ jobs:
           name: release-files
           path: dist
 
-      - name: Create Gitee release & upload zip
-        # GitHub 机房到 Gitee 的大文件上传常超时：发行版+说明必成，附件尽力而为
-        continue-on-error: true
+      - name: Create Gitee release with notes
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          ZIP=$(find dist -name "*.zip" | head -1)
-          python scripts/gitee_release.py "${{ github.ref_name }}" "$ZIP" dist/RELEASE.md
-
-      - name: "Fallback: publish zip to Gitee dist branch"
-        # git 协议走 sync 同款通道，通常能过大文件；raw 直链下载，成本一条分支
-        continue-on-error: true
-        env:
-          TOKEN: ${{ secrets.GITEE_TOKEN }}
-        run: |
-          ZIP=$(find dist -name "*.zip" | head -1)
-          mkdir distrepo && cd distrepo
-          git init -q -b dist
-          git config user.email "quad-todo-ci@users.noreply.github.com"
-          git config user.name "quad-todo-ci"
-          cp "../$ZIP" .
-          git add -A
-          git commit -qm "portable zip for ${{ github.ref_name }}"
-          git remote add gitee "https://geekkkk404:${TOKEN}@gitee.com/geekkkk404/quad-todo.git"
-          # 硬性 10 分钟上限，防止对岸链路把 job 挂死
-          timeout 600 git push -f gitee dist
+          python scripts/gitee_release.py "${{ github.ref_name }}" "" dist/RELEASE.md

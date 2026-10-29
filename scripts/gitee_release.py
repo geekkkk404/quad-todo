@@ -54,7 +54,8 @@ def multipart(field: str, filename: str, content: bytes):
 
 
 def main() -> None:
-    tag, zip_path = sys.argv[1], sys.argv[2]
+    tag = sys.argv[1]
+    zip_arg = sys.argv[2] if len(sys.argv) > 2 else ""
     notes_file = sys.argv[3] if len(sys.argv) > 3 else None
     token = os.environ["GITEE_TOKEN"]
     notes = Path(notes_file).read_text(encoding="utf-8") if notes_file else ""
@@ -72,12 +73,16 @@ def main() -> None:
     else:
         print("Gitee release exists:", rel.get("tag_name"), "id", rel.get("id"))
 
-    zip_path = Path(zip_path)
-    body, headers = multipart("file", zip_path.name, zip_path.read_bytes())
-    headers["Connection"] = "close"
-    result = call(f"releases/{rel['id']}/attach_files", token,
-                  payload=body, headers=headers, timeout=600)
-    print("attached:", result.get("name") if isinstance(result, dict) else result)
+    if zip_arg and Path(zip_arg).is_file():
+        zip_path = Path(zip_arg)
+        body, headers = multipart("file", zip_path.name, zip_path.read_bytes())
+        headers["Connection"] = "close"
+        result = call(f"releases/{rel['id']}/attach_files", token,
+                      payload=body, headers=headers, timeout=600)
+        print("attached:", result.get("name") if isinstance(result, dict) else result)
+    else:
+        print("未提供 zip，跳过附件上传（大文件请在本地网络执行 "
+              "scripts/upload-gitee-release.ps1 补传）")
     print("URL:", rel.get("html_url") or f"https://gitee.com/{OWNER}/{REPO}/releases/tag/{tag}")
 
 
