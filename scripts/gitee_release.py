@@ -20,7 +20,7 @@ API = f"https://gitee.com/api/v5/repos/{OWNER}/{REPO}"
 
 
 def call(url_suffix: str, token: str, *, payload: bytes | None = None,
-         headers: dict | None = None, timeout: int = 180, retries: int = 3):
+         headers: dict | None = None, timeout: int = 240, retries: int = 2):
     sep = "&" if "?" in url_suffix else "?"
     url = f"{API}/{url_suffix}{sep}access_token={token}"
     method = "POST" if payload is not None else "GET"

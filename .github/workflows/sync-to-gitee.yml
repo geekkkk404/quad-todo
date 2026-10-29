@@ -73,6 +73,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [sync, build-portable]
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -105,4 +106,5 @@ jobs:
           git add -A
           git commit -qm "portable zip for ${{ github.ref_name }}"
           git remote add gitee "https://geekkkk404:${TOKEN}@gitee.com/geekkkk404/quad-todo.git"
-          git push -f gitee dist
+          # 硬性 10 分钟上限，防止对岸链路把 job 挂死
+          timeout 600 git push -f gitee dist
