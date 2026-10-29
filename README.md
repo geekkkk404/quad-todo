@@ -60,7 +60,7 @@
 
 1. 更新 `quad_todo.pyw` 里的 `APP_VERSION` 和 `scripts/make_notes.py` 的更新内容；
 2. `git tag vX.Y && git push origin vX.Y` —— CI 自动构建绿色包、发布 GitHub Release、同步 Gitee 代码并创建同名 Gitee 发行版（含说明）；
-3. 双击 `scripts/发行版-上传附件到Gitee.bat`（输入 Gitee 私人令牌，令牌只走内存不落盘），把绿色包 zip 从本地网络补传为 Gitee 发行版附件——实测 GitHub 机房到 Gitee 的大文件传输不可用，附件必须走国内网络。
+3. 附件从本地网络补传：`python scripts/gitee_release.py vX.Y dist/<zip文件> dist/RELEASE.md`，令牌从仓库根目录 `.gitee-token` 文件（需自行创建并已 gitignore）或环境变量 `GITEE_TOKEN` 读取；`scripts/upload-gitee-release.ps1` 是带交互的等价实现。实测 GitHub 机房到 Gitee 的大文件传输不可用，附件必须走国内网络。
 
 ## License
 

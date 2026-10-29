@@ -11,3 +11,7 @@ __pycache__/
 build/
 dist/
 embed.zip
+
+# 个人私有：Gitee 令牌与本机专用启动器，绝不入库
+.gitee-token
+scripts/发行版-上传附件到Gitee.bat
