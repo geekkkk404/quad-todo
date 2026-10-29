@@ -90,7 +90,7 @@ jobs:
           ZIP=$(find dist -name "*.zip" | head -1)
           python scripts/gitee_release.py "${{ github.ref_name }}" "$ZIP" dist/RELEASE.md
 
-      - name: Fallback: publish zip to Gitee dist branch
+      - name: "Fallback: publish zip to Gitee dist branch"
         # git 协议走 sync 同款通道，通常能过大文件；raw 直链下载，成本一条分支
         continue-on-error: true
         env:
