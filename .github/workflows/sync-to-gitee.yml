@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: sync-${{ github.ref }}
+  group: sync-and-release
   cancel-in-progress: false
 
 jobs:
@@ -28,9 +28,18 @@ jobs:
           TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
           R="https://geekkkk404:${TOKEN}@gitee.com/geekkkk404/quad-todo.git"
-          # 用 origin/main 引用而非本地分支名，保证 tag 触发（detached HEAD）时同样可用
-          git push --force "$R" "origin/main:refs/heads/main"
-          git push --force "$R" "+refs/tags/*:refs/tags/*"
+          # 用 origin/main 引用而非本地分支名，保证 tag 触发（detached HEAD）时同样可用。
+          # 一次 git push main+tag 会同时触发两个 run：并行镜像曾把 Gitee 授权服务打到 408
+          # （v0.3 发版 2026-10-30 双双失败），除 workflow 级串行化外此处再加重试兜底。
+          for i in 1 2 3 4; do
+            if git push --force "$R" "origin/main:refs/heads/main" \
+               && git push --force "$R" "+refs/tags/*:refs/tags/*"; then
+              exit 0
+            fi
+            echo "mirror push 第 $i 次失败，30 秒后重试…"
+            sleep 30
+          done
+          exit 1
 
   build-portable:
     if: startsWith(github.ref, 'refs/tags/v')
