@@ -12,6 +12,7 @@ build/
 dist/
 embed.zip
 
-# 个人私有：Gitee 令牌与本机专用启动器，绝不入库
+# 个人私有：开发账本、Gitee 令牌与本机专用启动器，绝不入库
+开发账本.md
 .gitee-token
 scripts/发行版-上传附件到Gitee.bat
