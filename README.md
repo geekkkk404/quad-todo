@@ -10,7 +10,7 @@
   <img src="assets/ui.png" alt="QuadTodo 主界面" width="684">
 </p>
 
-当前版本：**v0.2** ・ License：[MIT](LICENSE)
+当前版本：**v0.3** ・ License：[MIT](LICENSE)
 
 **最快上手（推荐）**：点击本仓库页面上方的 **Releases / 发行版** 入口，下载最新的 `QuadTodo-v*-win64-portable.zip`，解压后双击 `QuadTodo.bat` —— 内置运行时，无需安装 Python。
 
