@@ -52,6 +52,7 @@ class App:
         self._editing = False          # 有输入框/对话框打开时暂停自动折叠
         self._outside = 0              # 指针离开窗口的轮询计数
         self._pressing = False         # 鼠标左键按住（拖动中）时暂停自动折叠/展开
+        self._menu_open = False        # 右键菜单弹出中（tk_popup 模态阻塞期间），暂停自动折叠
         self._ptr_at_collapse = None   # 上次折叠时的指针位置：没挪动就不自动展开
         self.quads = []                # [{id, canvas, inner, name_lbl, ...}]
         self._view = "quads"           # "quads" 四象限 | "arch" 归档箱
@@ -112,7 +113,7 @@ class App:
                 self.arch_btn = b
 
         self._update_auto_btn()
-        h.bind("<Button-3>", lambda e: self.ctx_menu.tk_popup(e.x_root, e.y_root))
+        h.bind("<Button-3>", lambda e: self._popup(self.ctx_menu, e.x_root, e.y_root))
 
     def _build_body(self):
         body = tk.Frame(self.root, bg="#f2f3f5")
@@ -181,6 +182,16 @@ class App:
         self.ctx_menu = Menu(self.root, tearoff=0, font=(FONT, 10))
         self.ctx_menu.add_command(label="折叠 / 展开", command=lambda: self.expand() if self.collapsed else self.collapse())
         self.ctx_menu.add_command(label="退出", command=self.quit)
+
+    def _popup(self, menu, x, y):
+        # Windows 上 tk_popup 模态阻塞到菜单收起，期间 after 定时器照常运行；
+        # 不暂停的话 _poll 把"指针悬在菜单上"判为已离开，右键约 750ms 后
+        # 主窗缩成药丸、菜单孤零零留下（P-014）。阻塞覆盖菜单全生命周期（含级联）。
+        self._menu_open = True
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            self._menu_open = False
 
     def _tip(self, widget, text):
         tip = tk.Toplevel(self.root)
@@ -259,7 +270,7 @@ class App:
         m.add_separator()
         m.add_command(label="归档（收进归档箱）", command=lambda: self._archive(task))
         m.add_command(label="删除", command=lambda: self._delete(task))
-        m.tk_popup(event.x_root, event.y_root)
+        self._popup(m, event.x_root, event.y_root)
 
     def _toggle(self, task):
         task["done"] = not task["done"]
@@ -405,7 +416,7 @@ class App:
         m = Menu(self.root, tearoff=0, font=(FONT, 10))
         m.add_command(label="恢复到原象限", command=lambda: self._arch_restore(task))
         m.add_command(label="彻底删除", command=lambda: self._arch_delete(task))
-        m.tk_popup(event.x_root, event.y_root)
+        self._popup(m, event.x_root, event.y_root)
 
     # ---------- 快速添加 ----------
     def _add_open(self, qi):
@@ -533,7 +544,7 @@ class App:
         self._pressing = False
 
     def _poll(self):
-        if self.auto.get() and not self._editing and not self._pressing:
+        if self.auto.get() and not self._menu_open and not self._editing and not self._pressing:
             inside = self._pointer_inside()
             if inside:
                 self._outside = 0
