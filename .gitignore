@@ -12,7 +12,10 @@ build/
 dist/
 embed.zip
 
-# 个人私有：开发账本、Gitee 令牌与本机专用启动器，绝不入库
+# 个人私有：开发账本、Gitee 令牌与维护者本地发版工具，绝不入库
 开发账本.md
 .gitee-token
 scripts/发行版-上传附件到Gitee.bat
+scripts/release.ps1
+scripts/发版-一键发布.bat
+scripts/upload-gitee-release.ps1

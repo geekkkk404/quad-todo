@@ -1,9 +1,17 @@
-"""生成发行版说明 dist/RELEASE.md（CI 用）。发新版时更新本文件的更新内容。"""
+"""生成发行版说明 dist/RELEASE.md（CI 与一键发版共用）。
+更新内容从仓库根目录的 RELEASE_NOTES.md 读取——发版前只需改那一个 markdown。"""
 import sys
 from pathlib import Path
 
 TAG = sys.argv[1]
 VER = TAG.lstrip("v")
+NOTES_FILE = Path(__file__).resolve().parent.parent / "RELEASE_NOTES.md"
+
+updates = ""
+if NOTES_FILE.exists():
+    updates = NOTES_FILE.read_text(encoding="utf-8").strip()
+if not updates:
+    sys.exit("RELEASE_NOTES.md 不存在或为空：发版前请把本次更新内容（markdown 列表）写进去。")
 
 TEXT = f"""# QuadTodo {TAG}
 
@@ -12,9 +20,7 @@ TEXT = f"""# QuadTodo {TAG}
 - Source code：源码运行，需自备 Python 3.8+（仅标准库，无需 pip 安装）。
 
 ## 更新内容
-- 新增 Windows 绿色免安装包：embeddable Python 3.13 + tkinter/tcl 完整内置，零基础用户开箱即用
-- 发行版流水线自动化：打 tag 后自动构建绿色包并发布到 GitHub Releases 与 Gitee 发行版
-- 自带「开机自启-安装或取消.bat」，指向包内运行时，不依赖系统 Python
+{updates}
 """
 
 Path("dist").mkdir(exist_ok=True)

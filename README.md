@@ -63,9 +63,14 @@
 
 ## 发布新版本（维护者）
 
-1. 更新 `quad_todo.pyw` 里的 `APP_VERSION` 和 `scripts/make_notes.py` 的更新内容；
-2. `git tag vX.Y && git push origin vX.Y` —— CI 自动构建绿色包、发布 GitHub Release、同步 Gitee 代码并创建同名 Gitee 发行版（含说明）；
-3. 附件从本地网络补传：`python scripts/gitee_release.py vX.Y dist/<zip文件> dist/RELEASE.md`，令牌从仓库根目录 `.gitee-token` 文件（需自行创建并已 gitignore）或环境变量 `GITEE_TOKEN` 读取；`scripts/upload-gitee-release.ps1` 是带交互的等价实现。实测 GitHub 机房到 Gitee 的大文件传输不可用，附件必须走国内网络。
+一键发版：把本次更新内容写进仓库根目录的 `RELEASE_NOTES.md`（markdown 列表），然后双击 `scripts\发版-一键发布.bat`。脚本自动完成：
+
+1. 预检（main 分支、与远端同步、工作区干净）；
+2. 输入版本号（回车取默认 = 当前小版本 +1，自动回写 `APP_VERSION` 与 README 版本号并提交）→ 打 tag 推送；
+3. 等待 CI 构建发布（GitHub Release + Gitee 发行版说明），失败会给出排查链接与清理命令；
+4. 从 GitHub Release 下载绿色包到 `dist\`，复用 `scripts\upload-gitee-release.ps1` 从本地网络补传 Gitee 附件（令牌读 `.gitee-token`）。
+
+手动兜底（脚本中断时）：tag 已推送则等 CI 完成后手动下载 zip 放进 `dist\`，再跑 `python scripts/gitee_release.py vX.Y dist/<zip> dist/RELEASE.md`（或双击 `scripts\发行版-上传附件到Gitee.bat`）。实测 GitHub 机房到 Gitee 的大文件传输不可用，附件必须走国内网络。
 
 ## License
 
