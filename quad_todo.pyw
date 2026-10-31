@@ -1,4 +1,4 @@
-"""QuadTodo v0.1 — 桌面四象限待办小窗
+"""QuadTodo — 桌面四象限待办小窗
 置顶、无边框、自动折叠贴边（鼠标移上去展开），数据纯本地（脚本同目录 tasks.json）。
 用法：双击运行；`python quad_todo.pyw --smoke` 为自检模式。
 """
@@ -8,9 +8,9 @@ import sys
 from datetime import datetime
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import Menu, messagebox, simpledialog
+from tkinter import Menu, messagebox
 
-APP_VERSION = "0.3"
+APP_VERSION = "0.4"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(APP_DIR, "tasks.json")
@@ -24,6 +24,8 @@ QUADS = [
 W, H = 680, 440
 PILL_H = 180          # 折叠药丸宽度按文字实测自适应（self.pill_w）
 FONT = "Microsoft YaHei UI"
+MENU_BG, MENU_FG = "#ffffff", "#333333"                # 右键菜单白底深字
+MENU_ACTIVE_BG, MENU_ACTIVE_FG = "#2f3640", "#ffffff"  # 悬停反色（同标题栏）
 
 
 def load_data():
@@ -41,6 +43,76 @@ def load_data():
         except OSError:
             pass
         return {"window": {}, "tasks": []}
+
+
+class EditDialog(tk.Toplevel):
+    """主题化编辑弹窗，替代 tkinter 自带的古董输入弹窗（无主题 + 默认羽毛图标，P-016）。
+    OK 后 self.result = 输入原文（调用方自行 strip 判空），取消 = None。
+    """
+
+    def __init__(self, parent, title, label, initial=""):
+        super().__init__(parent)
+        self.result = None
+        self.withdraw()                    # 先藏起，show() 居中后再亮，避免闪跳
+        self.title(title)
+        self.configure(bg="#f2f3f5")
+        self.resizable(False, False)
+        self.transient(parent)
+
+        body = tk.Frame(self, bg="#f2f3f5")
+        body.pack(fill="both", expand=True, padx=16, pady=(14, 12))
+        tk.Label(body, text=label, bg="#f2f3f5", fg="#333333",
+                 font=(FONT, 10)).pack(anchor="w")
+        self.ent = tk.Entry(body, font=(FONT, 11), bg="white", relief="flat",
+                            highlightthickness=1, highlightbackground="#d0d4d8",
+                            highlightcolor="#2f3640", insertbackground="#333333")
+        self.ent.pack(fill="x", pady=(4, 14), ipady=3)
+        btns = tk.Frame(self, bg="#f2f3f5")
+        btns.pack(fill="x", padx=16, pady=(0, 14))
+        ok = tk.Label(btns, text="保存", bg="#2f3640", fg="white",
+                      font=(FONT, 10), padx=18, pady=3, cursor="hand2")
+        ok.pack(side="right")
+        no = tk.Label(btns, text="取消", bg="#e4e6e9", fg="#333333",
+                      font=(FONT, 10), padx=18, pady=3, cursor="hand2")
+        no.pack(side="right", padx=(0, 8))
+
+        self.ent.insert(0, initial)
+        for w in (self, self.ent):
+            w.bind("<Return>", lambda e: self.done())
+            w.bind("<Escape>", lambda e: self.cancel())
+        ok.bind("<Button-1>", lambda e: self.done())
+        no.bind("<Button-1>", lambda e: self.cancel())
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+
+    def done(self):
+        self.result = self.ent.get()
+        self._close()
+
+    def cancel(self):
+        self.result = None
+        self._close()
+
+    def _close(self):
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
+        self.destroy()
+
+    def show(self):
+        # 居中于父窗口显示；模态由调用方 wait_window 承接（P-014 教训：阻塞式生命周期）
+        self.deiconify()
+        self.update_idletasks()
+        m = self.master
+        x = m.winfo_rootx() + (m.winfo_width() - self.winfo_reqwidth()) // 2
+        y = m.winfo_rooty() + (m.winfo_height() - self.winfo_reqheight()) // 2
+        self.wm_geometry(f"+{x}+{y}")
+        self.attributes("-topmost", True)  # 主窗常置顶，弹窗必须压在其上
+        self.ent.focus_set()
+        self.ent.select_range(0, "end")
+        self.ent.icursor("end")
+        self.wait_visibility()
+        self.grab_set()
 
 
 class App:
@@ -69,6 +141,7 @@ class App:
         root.attributes("-topmost", True)
         root.attributes("-alpha", 0.94)
         root.configure(bg="#f2f3f5")
+        self._make_icon()
 
         self._build_header()
         self._build_body()
@@ -178,8 +251,28 @@ class App:
                           self.f_small.measure("0")) + 12
         self.pill = p
 
+    def _make_icon(self):
+        # 程序内画 32px 四象限色块图标，替代 Tk 默认"羽毛"（弹窗标题栏可见）
+        s = 32
+        h = s // 2
+        img = tk.PhotoImage(width=s, height=s)
+        img.put(QUADS[0][2], to=(0, 0, h, h))
+        img.put(QUADS[1][2], to=(h, 0, s, h))
+        img.put(QUADS[2][2], to=(0, h, h, s))
+        img.put(QUADS[3][2], to=(h, h, s, s))
+        self.root.iconphoto(True, img)   # True：根窗口 + 之后所有 Toplevel 共用
+        self._icon = img                 # 必须持引用，PhotoImage 被 GC 图标会丢
+
+    def _new_menu(self, parent=None):
+        # 扁平右键菜单：白底深字、悬停深底白字反色、去 3D 边框（P-016）
+        return Menu(parent or self.root, tearoff=0, font=(FONT, 10),
+                    bg=MENU_BG, fg=MENU_FG,
+                    activebackground=MENU_ACTIVE_BG,
+                    activeforeground=MENU_ACTIVE_FG,
+                    borderwidth=1, relief="flat", activeborderwidth=0)
+
     def _build_menu(self):
-        self.ctx_menu = Menu(self.root, tearoff=0, font=(FONT, 10))
+        self.ctx_menu = self._new_menu()
         self.ctx_menu.add_command(label="折叠 / 展开", command=lambda: self.expand() if self.collapsed else self.collapse())
         self.ctx_menu.add_command(label="退出", command=self.quit)
 
@@ -260,9 +353,9 @@ class App:
         cb.bind("<Button-3>", lambda e, t=task: self._row_menu(e, t))
 
     def _row_menu(self, event, task):
-        m = Menu(self.root, tearoff=0, font=(FONT, 10))
+        m = self._new_menu()
         m.add_command(label="编辑…", command=lambda: self._edit(task))
-        sub = Menu(m, tearoff=0, font=(FONT, 10))
+        sub = self._new_menu(m)
         for qid, name, color, _ in QUADS:
             if qid != task["quad"]:
                 sub.add_command(label=name, command=lambda q=qid: self._move(task, q))
@@ -281,11 +374,13 @@ class App:
         if self._editing:
             return
         self._editing = True
-        self.root.attributes("-topmost", False)
-        new = simpledialog.askstring("编辑任务", "任务内容：",
-                                     initialvalue=task["title"], parent=self.root)
-        self.root.attributes("-topmost", True)
-        self._editing = False
+        try:
+            dlg = EditDialog(self.root, "编辑任务", "任务内容：", task["title"])
+            dlg.show()
+            dlg.wait_window()      # 阻塞到弹窗关闭，期间 after 定时器照常服务
+            new = dlg.result
+        finally:
+            self._editing = False  # 异常路径同样复位（P-014 教训同款 try/finally）
         if new is not None and new.strip():
             task["title"] = new.strip()
             self.save()
@@ -413,7 +508,7 @@ class App:
         lbl.bind("<Button-3>", lambda e, t=task: self._arch_menu(e, t))
 
     def _arch_menu(self, event, task):
-        m = Menu(self.root, tearoff=0, font=(FONT, 10))
+        m = self._new_menu()
         m.add_command(label="恢复到原象限", command=lambda: self._arch_restore(task))
         m.add_command(label="彻底删除", command=lambda: self._arch_delete(task))
         self._popup(m, event.x_root, event.y_root)
