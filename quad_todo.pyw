@@ -22,7 +22,8 @@ QUADS = [
     (4, "不紧急不重要", "#7f8c8d", "尽量不做"),
 ]
 W, H = 680, 440
-PILL_H = 180          # 折叠药丸宽度按文字实测自适应（self.pill_w）
+PILL_H = 64           # 药丸高：两行数字（红区=0 时单行仍垂直居中）；宽按"99+"实测自适应（self.pill_w）
+PILL_HOT_FG = "#e74c3c"  # 红区数字：提亮版红区色（#c0392b 在深底 #2f3640 上对比不足）
 FONT = "Microsoft YaHei UI"
 MENU_BG, MENU_FG = "#ffffff", "#333333"                # 右键菜单白底深字
 MENU_ACTIVE_BG, MENU_ACTIVE_FG = "#2f3640", "#ffffff"  # 悬停反色（同标题栏）
@@ -235,20 +236,21 @@ class App:
         self.qmap = {q["id"]: q for q in self.quads}
 
     def _build_pill(self):
+        # 纯数字药丸（P-017）：总数白、红区红，颜色即语义——悬停即展开挂不了 tooltip
         p = tk.Frame(self.root, bg="#2f3640", cursor="hand2")
         # Tk 事件不会从子控件冒泡到父 Frame，标签必须各自绑定点击
         go = lambda e: self.expand()
-        t1 = tk.Label(p, text="待\n办", bg="#2f3640", fg="white",
-                      font=self.f_title, justify="center", cursor="hand2")
-        t1.pack(side="top", pady=(8, 2))
-        self.pill_cnt = tk.Label(p, text="", bg="#2f3640", fg="#e67e22",
-                                 font=self.f_small, justify="center", cursor="hand2")
-        self.pill_cnt.pack(side="top", pady=2)
-        for w in (p, t1, self.pill_cnt):
+        self.pill_total = tk.Label(p, text="", bg="#2f3640", fg="white",
+                                   font=self.f_title, cursor="hand2")
+        self.pill_hot = tk.Label(p, text="", bg="#2f3640", fg=PILL_HOT_FG,
+                                 font=self.f_title, cursor="hand2")
+        # expand+fill：红区=0 剩一行时，数字垂直居中而非堆在顶部
+        self.pill_total.pack(side="top", expand=True, fill="both")
+        self.pill_hot.pack(side="top", expand=True, fill="both")
+        for w in (p, self.pill_total, self.pill_hot):
             w.bind("<Button-1>", go)
-        # 宽度取最宽一行实测值，避免不同 DPI/字体下文字被裁掉一半
-        self.pill_w = max(self.f_title.measure("待"), self.f_small.measure("红区"),
-                          self.f_small.measure("0")) + 12
+        # 宽度取"99+"实测值（>99 封顶显示），避免不同 DPI/字体下数字被裁掉一半
+        self.pill_w = self.f_title.measure("99+") + 12
         self.pill = p
 
     def _make_icon(self):
@@ -587,7 +589,7 @@ class App:
             self._add_cancel()
         sw = self.root.winfo_screenwidth()
         w = int(self.pill_w)
-        self.root.geometry(f"{w}x{PILL_H}+{sw - w - 2}+{self._pos[1]}")
+        self.root.geometry(f"{w}x{PILL_H}+{sw - w}+{self._pos[1]}")  # 贴死右缘：边缘热区无限宽（P-017）
         self.header.pack_forget()
         self.body.pack_forget()
         self.body_arch.pack_forget()
@@ -608,7 +610,7 @@ class App:
         # 贴着药丸展开（屏幕右缘、同一高度），指针必然落进窗口内；
         # 若展开到别处而指针停在药丸上，会陷入"展开-折叠"死循环
         sw = self.root.winfo_screenwidth()
-        x = max(0, sw - W - 2)
+        x = max(0, sw - W)   # 右缘与贴边药丸对齐，折叠/展开不横跳
         y = self._pos[1]
         self._pos = [x, y]
         self.root.geometry(f"{W}x{H}+{x}+{y}")
@@ -619,8 +621,14 @@ class App:
                      if not t["done"] and not t.get("archived"))
         hot = sum(1 for t in self.tasks if not t["done"] and t["quad"] == 1
                   and not t.get("archived"))
-        self.pill_cnt.configure(
-            text=f"{undone}\n项" + (f"\n红区\n{hot}" if hot else ""))
+        # 0 也照常显示（灰白）：药丸是悬停展开的唯一入口，不能消失（P-003）
+        self.pill_total.configure(text="99+" if undone > 99 else str(undone),
+                                  fg="#95a5a6" if undone == 0 else "white")
+        if hot:
+            self.pill_hot.configure(text="99+" if hot > 99 else str(hot))
+            self.pill_hot.pack(side="top", expand=True, fill="both")
+        else:
+            self.pill_hot.pack_forget()
 
     def _pointer_inside(self):
         w = self.root.winfo_containing(self.root.winfo_pointerx(),
