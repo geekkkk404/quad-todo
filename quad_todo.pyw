@@ -10,7 +10,7 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import Menu, messagebox
 
-APP_VERSION = "0.4"
+APP_VERSION = "0.5"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(APP_DIR, "tasks.json")
