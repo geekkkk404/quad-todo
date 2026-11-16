@@ -2,6 +2,7 @@
 置顶、无边框、自动折叠贴边（鼠标移上去展开），数据纯本地（脚本同目录 tasks.json）。
 用法：双击运行；`python quad_todo.pyw --smoke` 为自检模式。
 """
+import ctypes
 import json
 import os
 import sys
@@ -10,7 +11,7 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import Menu, messagebox
 
-APP_VERSION = "0.5"
+APP_VERSION = "0.6"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(APP_DIR, "tasks.json")
@@ -27,6 +28,18 @@ PILL_HOT_FG = "#e74c3c"  # 红区数字：提亮版红区色（#c0392b 在深底
 FONT = "Microsoft YaHei UI"
 MENU_BG, MENU_FG = "#ffffff", "#333333"                # 右键菜单白底深字
 MENU_ACTIVE_BG, MENU_ACTIVE_FG = "#2f3640", "#ffffff"  # 悬停反色（同标题栏）
+
+# topmost 自愈（P-020）：Tk 的 -topmost 读取返回内部缓存，外部 SetWindowPos 降级后
+# 仍报 True（探针实测），检测必须读真实样式位；治愈用 attributes(True) 即可（实测
+# 缓存态下也真发 SetWindowPos，不带激活、不动几何）。ctypes 为标准库，零依赖铁律无涉。
+_u32 = ctypes.WinDLL("user32")
+_u32.GetAncestor.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+_u32.GetAncestor.restype = ctypes.c_void_p          # HWND 不可按 c_int 收发，负值 HWND_* 会被零扩展（P-020 教训）
+_u32.GetWindowLongW.argtypes = [ctypes.c_void_p, ctypes.c_int]
+_u32.GetWindowLongW.restype = ctypes.c_long
+GA_ROOT = 2
+GWL_EXSTYLE = -20
+WS_EX_TOPMOST = 0x8
 
 
 def load_data():
@@ -130,6 +143,8 @@ class App:
         self.quads = []                # [{id, canvas, inner, name_lbl, ...}]
         self._view = "quads"           # "quads" 四象限 | "arch" 归档箱
         self._add_cancel = None        # 正在打开的快速添加输入框的取消函数
+        self._top_hwnd = None          # 主窗顶层 HWND（惰性解析，topmost 自愈用，P-020）
+        self._tips = []                # 全部 tooltip Toplevel：映射中暂停自愈，防重申把 tooltip 盖住
         self.auto = tk.BooleanVar(value=self.data.get("window", {}).get("auto", True))
 
         self.f_title = tkfont.Font(family=FONT, size=10, weight="bold")
@@ -292,6 +307,7 @@ class App:
         tip = tk.Toplevel(self.root)
         tip.withdraw()
         tip.overrideredirect(True)
+        self._tips.append(tip)
         lbl = tk.Label(tip, text=text, bg="#333", fg="white",
                        font=self.f_small, padx=6, pady=2)
 
@@ -646,7 +662,25 @@ class App:
     def _press_clear(self, _):
         self._pressing = False
 
+    def _ensure_topmost(self):
+        # topmost 自愈（P-020）：全屏应用覆盖 / 睡眠唤醒等导致 z 序降级后，原实现永不重申。
+        # 检测读真实样式位（Tk 的 -topmost 读取是缓存，外部降级后仍报 True，探针实测）；
+        # 治愈走 attributes(True)——缓存态下也会真发 SetWindowPos，不带激活、不动几何。
+        if self._top_hwnd is None:
+            hwnd = _u32.GetAncestor(self.root.winfo_id(), GA_ROOT)
+            if not hwnd:
+                return
+            self._top_hwnd = hwnd
+        if _u32.GetWindowLongW(self._top_hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST:
+            return
+        self.root.attributes("-topmost", True)
+
     def _poll(self):
+        # topmost 重申有 z 序副作用（主窗插回 topmost 带顶），拖动/对话框/右键菜单期间
+        # 跳过，tooltip 映射中也跳过——否则会把 tooltip 压到主窗之下（deepl-quick P-016 同款教训）。
+        if not self._pressing and not self._editing and not self._menu_open \
+                and not any(t.winfo_ismapped() for t in self._tips):
+            self._ensure_topmost()
         if self.auto.get() and not self._menu_open and not self._editing and not self._pressing:
             inside = self._pointer_inside()
             if inside:
