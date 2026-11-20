@@ -17,7 +17,7 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import Menu, messagebox
 
-APP_VERSION = "0.7"
+APP_VERSION = "0.8"
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(APP_DIR, "tasks.json")
@@ -79,6 +79,16 @@ def _crashlog(msg):
             f.write(f"[{ts} pid={os.getpid()}] v{APP_VERSION} {msg}\n")
     except OSError:
         pass
+
+
+def _clamp_xy(x, y, w, h, sw, sh):
+    """把窗口坐标夹回主屏内（纯函数，deepl-quick U-006 方案 B 同机制）。
+    RDP 换客户端/重连、竖横屏切换等分辨率变化后，按旧屏宽算出的折叠药丸
+    坐标会整体滞留屏外（2026-11-20 用户实测：多机 RDP 场景药丸消失）——
+    越界就夹回当前屏，药丸态贴当前右缘。"""
+    x = max(0, min(int(x), int(sw) - int(w)))
+    y = max(0, min(int(y), int(sh) - int(h)))
+    return x, y
 
 
 def load_data():
@@ -1081,7 +1091,9 @@ class App:
         # 若展开到别处而指针停在药丸上，会陷入"展开-折叠"死循环
         sw = self.root.winfo_screenwidth()
         x = max(0, sw - W)   # 右缘与贴边药丸对齐，折叠/展开不横跳
-        y = self._pos[1]
+        # y 钳回屏内：药丸贴屏底时（P-023 clamp 后的合法位置）直接展开会下半出屏；
+        # 窗体仍覆盖药丸区，指针必落窗内（P-003 假设不破）
+        y = max(0, min(self._pos[1], self.root.winfo_screenheight() - H))
         self._pos = [x, y]
         self.root.geometry(f"{W}x{H}+{x}+{y}")
         self.root.attributes("-alpha", 0.94)
@@ -1142,12 +1154,34 @@ class App:
         except tk.TclError:
             pass
 
+    def _clamp_into_screen(self):
+        # 越界自愈（dq U-006 方案 B 同机制）：RDP 换客户端/重连、竖横屏切换导致
+        # 会话分辨率变化后，按旧屏宽算出的窗口坐标整体滞留屏外（2026-11-20 用户
+        # 实测：多机 RDP 场景药丸消失于屏外）。屏宽用实时值（Tk 随会话自动跟上）；
+        # 全串 geometry 重发——dq 在册教训：紧跟 geometry 请求的首 call 可能被吞，
+        # 自愈收敛式（越界持续为真则每 250ms 重发），实测第二拍必落地。
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        w = self.root.winfo_width()
+        h = self.root.winfo_height()
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+        if x < 0 or y < 0 or x + w > sw or y + h > sh:
+            nx, ny = _clamp_xy(x, y, w, h, sw, sh)
+            self.root.geometry(f"{w}x{h}+{nx}+{ny}")
+            if self.collapsed:
+                self._pos[1] = ny       # 药丸 y 记忆同步：展开后不跳高
+            else:
+                self._pos = [nx, ny]
+
     def _poll(self):
         # topmost 重申有 z 序副作用（主窗插回 topmost 带顶），拖动/对话框/右键菜单期间
         # 跳过，tooltip 映射中也跳过——否则会把 tooltip 压到主窗之下（deepl-quick P-016 同款教训）。
+        # clamp 移动几何同样不碰交互中的窗口，共用同一守卫块。
         if not self._pressing and not self._editing and not self._menu_open \
                 and not any(t.winfo_ismapped() for t in self._tips):
             self._ensure_topmost()
+            self._clamp_into_screen()
         if self.auto.get() and not self._menu_open and not self._editing and not self._pressing:
             inside = self._pointer_inside()
             if inside:
@@ -1330,6 +1364,12 @@ def run_smoke():
     check("real topmost invalid hwnd", _is_real_topmost(0) is False and _is_real_topmost(None) is False)
     check("band-loss invalid hwnd", _lost_topmost_band(0, 10, 10, 38, 64) is False
           and _lost_topmost_band(None, 10, 10, 38, 64) is False)
+
+    # 11 越界夹回纯函数（P-023：RDP 分辨率变化自愈，dq 同款 4 边界）
+    check("clamp inside stays", _clamp_xy(100, 100, 400, 600, 1920, 1080) == (100, 100))
+    check("clamp right/bottom edge", _clamp_xy(5000, 800, 400, 600, 1920, 1080) == (1520, 480))
+    check("clamp negative", _clamp_xy(-50, -20, 400, 600, 1920, 1080) == (0, 0))
+    check("clamp oversized window", _clamp_xy(100, 100, 2000, 1200, 1920, 1080) == (0, 0))
 
     # 10 UI 冒烟：临时数据构造 App（--smoke 分支 500ms 自毁），验证真实 tasks.json 未触碰
     import hashlib
