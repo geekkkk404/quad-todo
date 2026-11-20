@@ -8,7 +8,6 @@
     runtime/            官方 embeddable Python + 从完整安装抽取的 tkinter/tcl
     quad_todo.pyw       主程序
     QuadTodo.bat        启动器（纯 ASCII 壳，设 TCL/TK_LIBRARY 后拉起 pythonw）
-    开机自启-安装或取消.bat / autostart.ps1
     使用说明.txt
 
 embeddable 包默认不带 tkinter，本脚本从同版本完整安装补齐：
